@@ -301,6 +301,91 @@ def cmd_viz(args):
             continue
 
 
+def cmd_beliefs(args):
+    """View and manage the self-model (identity-level beliefs)."""
+    cfg = load_config(args.config)
+    model_path = cfg.memory_dir / "self-model.yaml"
+
+    if args.bootstrap:
+        # Bootstrap from MEMORY.md or provided text
+        from .self_model import SelfModelEngine
+        from .providers import get_provider
+
+        source = cfg.long_term_memory
+        if not source.exists():
+            print("❌ No MEMORY.md found. Write one first, or use --input.")
+            return
+
+        text = source.read_text()
+        # Also include recent entities for richer bootstrapping
+        entity_texts = []
+        if cfg.entities_dir.exists():
+            for f in sorted(cfg.entities_dir.glob("*.md"))[:20]:
+                entity_texts.append(f.read_text()[:500])
+        if entity_texts:
+            text += "\n\n## Entity Context\n" + "\n".join(entity_texts)
+
+        llm = get_provider(cfg.extraction.provider, model=cfg.extraction.model)
+        engine = SelfModelEngine(llm, model_path)
+
+        print("🧠 Bootstrapping self-model from MEMORY.md + entities...")
+        model = engine.bootstrap_sync(text)
+        print(f"✅ Created {len(model.beliefs)} beliefs in memory/self-model.yaml\n")
+        print(model.format_readable())
+
+    elif args.drift:
+        # Detect drift from today's events
+        from .self_model import SelfModelEngine
+        from .providers import get_provider
+
+        date_str = args.date or date.today().isoformat()
+        daily_path = cfg.memory_dir / f"{date_str}.md"
+
+        if not daily_path.exists():
+            print(f"❌ No daily log for {date_str}")
+            return
+        if not model_path.exists():
+            print("❌ No self-model yet. Run: garden beliefs --bootstrap")
+            return
+
+        llm = get_provider(cfg.extraction.provider, model=cfg.extraction.model)
+        engine = SelfModelEngine(llm, model_path)
+
+        events = daily_path.read_text()
+        print(f"🔍 Detecting identity drift from {date_str}...")
+        drifts = engine.detect_drift_sync(events)
+        print(engine.format_drifts(drifts))
+
+        if drifts and args.apply:
+            model = engine.apply_drifts(drifts, significance_threshold=args.threshold)
+            print(f"\n✅ Applied {len([d for d in drifts if d.significance >= args.threshold])} drifts to self-model.")
+
+    else:
+        # Show current beliefs
+        from .self_model import SelfModel
+
+        if not model_path.exists():
+            print("No self-model yet. Bootstrap with: garden beliefs --bootstrap")
+            return
+
+        model = SelfModel.from_yaml(model_path.read_text())
+
+        if args.json:
+            print(json.dumps([b.to_dict() for b in model.active_beliefs()], indent=2))
+        elif args.weak:
+            weak = model.weakening()
+            if weak:
+                print("⚠ Weakening Beliefs:")
+                for b in weak:
+                    print(f"  [{b.confidence:.0%}] {b.claim}")
+                    if b.evidence_against:
+                        print(f"       Counter: {', '.join(b.evidence_against[-3:])}")
+            else:
+                print("No weakening beliefs.")
+        else:
+            print(model.format_readable())
+
+
 def cmd_stats(args):
     """Show garden statistics."""
     cfg = load_config(args.config)
@@ -422,6 +507,17 @@ def main():
     p_viz = sub.add_parser("viz", help="Visualize knowledge graph (Mermaid)")
     p_viz.set_defaults(func=cmd_viz)
     
+    # beliefs
+    p_beliefs = sub.add_parser("beliefs", help="View/manage identity-level self-model")
+    p_beliefs.add_argument("--bootstrap", action="store_true", help="Bootstrap self-model from MEMORY.md")
+    p_beliefs.add_argument("--drift", action="store_true", help="Detect identity drift from today's events")
+    p_beliefs.add_argument("--apply", action="store_true", help="Apply detected drifts to self-model")
+    p_beliefs.add_argument("--date", "-d", help="Date for drift detection (default: today)")
+    p_beliefs.add_argument("--threshold", type=float, default=0.3, help="Min significance to apply (default: 0.3)")
+    p_beliefs.add_argument("--json", action="store_true", help="Output as JSON")
+    p_beliefs.add_argument("--weak", action="store_true", help="Show only weakening beliefs")
+    p_beliefs.set_defaults(func=cmd_beliefs)
+
     # stats
     p_stats = sub.add_parser("stats", help="Show garden statistics")
     p_stats.set_defaults(func=cmd_stats)
