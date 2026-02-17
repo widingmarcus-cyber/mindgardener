@@ -301,6 +301,32 @@ def cmd_viz(args):
             continue
 
 
+def cmd_evaluate(args):
+    """Evaluate agent output against the knowledge graph."""
+    cfg = load_config(args.config)
+    from .evaluate import evaluate_output, write_back
+
+    text = args.text
+    if args.file:
+        text = Path(args.file).read_text()
+    if not text:
+        print("❌ Provide text with --text or --file")
+        return
+
+    result = evaluate_output(text, cfg)
+    print(result.summary())
+
+    if args.write_back:
+        actions = write_back(result, cfg, min_confidence=args.min_confidence, dry_run=args.dry_run)
+        if actions:
+            print(f"\n### Write-back Actions")
+            for a in actions:
+                print(f"  {a}")
+
+    if args.json:
+        print(json.dumps(result.to_json(), indent=2))
+
+
 def cmd_beliefs(args):
     """View and manage the self-model (identity-level beliefs)."""
     cfg = load_config(args.config)
@@ -507,6 +533,16 @@ def main():
     p_viz = sub.add_parser("viz", help="Visualize knowledge graph (Mermaid)")
     p_viz.set_defaults(func=cmd_viz)
     
+    # evaluate
+    p_eval = sub.add_parser("evaluate", help="Fact-check agent output against knowledge graph")
+    p_eval.add_argument("--text", "-t", help="Text to evaluate")
+    p_eval.add_argument("--file", "-f", help="File containing text to evaluate")
+    p_eval.add_argument("--write-back", "-w", action="store_true", help="Write verified facts back to entities")
+    p_eval.add_argument("--dry-run", action="store_true", help="Show what would be written without writing")
+    p_eval.add_argument("--min-confidence", type=float, default=0.6, help="Min confidence for write-back (default: 0.6)")
+    p_eval.add_argument("--json", action="store_true", help="Output as JSON")
+    p_eval.set_defaults(func=cmd_evaluate)
+
     # beliefs
     p_beliefs = sub.add_parser("beliefs", help="View/manage identity-level self-model")
     p_beliefs.add_argument("--bootstrap", action="store_true", help="Bootstrap self-model from MEMORY.md")
