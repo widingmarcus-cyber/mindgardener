@@ -1,8 +1,8 @@
-# 🌱 MindGardener — A Hippocampus for AI Agents
+# 🌱 MindGardener
 
-> Open source memory consolidation layer for LLM agents. Extract, connect, and forget — like a brain.
+**Long-term memory for AI agents.**
 
-Most agent frameworks handle **thinking** (Chain of Thought). MindGardener handles **remembering** (Consolidation).
+Your agent forgets everything between sessions. MindGardener fixes that — it reads your agent's daily logs and automatically builds a wiki of everyone and everything it encounters. No database needed. Just text files.
 
 ## The Problem
 
