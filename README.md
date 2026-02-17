@@ -2,7 +2,20 @@
 
 **Your AI agent's personal Wikipedia — automatically built and updated from daily conversations.**
 
-Every time you chat with your agent, it learns about people, projects, and events. MindGardener turns those conversations into a personal wiki that grows over time. Your agent remembers what happened last week, who you talked about, and what matters. No database needed. Just text files.
+Every time you chat with your agent, it mentions people, projects, tools, and events. MindGardener turns those conversations into a personal wiki — one markdown file per entity — that grows over time. Your agent remembers what happened last week, who you talked about, and what matters.
+
+No database needed. Just text files.
+
+## How It Stays Manageable
+
+You might wonder: won't this create thousands of files? No. MindGardener is opinionated about what it remembers:
+
+- **One file per entity.** A person, a company, a project each gets one `.md` file. Mentions across different days get merged into the same file — not duplicated.
+- **Surprise scoring decides what's worth keeping.** Not everything is interesting. MindGardener predicts what *should* have happened based on what it already knows, then compares with what *actually* happened. Only surprising things get promoted to long-term memory. Routine stuff fades.
+- **Automatic pruning.** Entities that haven't been mentioned in 30+ days get archived. Your wiki stays focused on what's active and relevant.
+- **You can edit it.** It's just markdown files in a folder. Open them in VS Code, Obsidian, or `vim`. Add facts, fix mistakes, delete things. Run `garden reindex` and the system catches up.
+
+A typical agent running for a month has 30-80 entity files. That's it — a small, browsable wiki, not a data dump.
 
 ## The Problem
 
