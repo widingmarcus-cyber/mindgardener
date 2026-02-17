@@ -216,6 +216,35 @@ def cmd_merge(args):
         print("       garden merge --detect")
 
 
+def cmd_context(args):
+    """Assemble token-budget-aware context for a query."""
+    cfg = load_config(args.config)
+    from .context import assemble_context
+    
+    result = assemble_context(
+        query=args.query,
+        config=cfg,
+        token_budget=args.budget,
+        include_recent_days=args.days,
+        max_entities=args.max_entities,
+    )
+    
+    manifest = result["manifest"]
+    
+    if args.manifest_only:
+        import json
+        print(json.dumps(manifest, indent=2))
+    else:
+        print(result["context"])
+        print(f"\n--- Manifest ---")
+        print(f"Tokens: {manifest['tokens_used']}/{manifest['token_budget']} ({manifest['utilization']:.0%})")
+        print(f"Loaded: {manifest['loaded_count']} sources")
+        if manifest['skipped']:
+            print(f"Skipped: {manifest['skipped_count']} sources")
+            for s in manifest['skipped']:
+                print(f"  - {s['type']}: {s.get('name', s.get('date', '?'))} ({s['reason']})")
+
+
 def cmd_fix(args):
     """Correct entity data without re-running extraction."""
     cfg = load_config(args.config)
@@ -367,6 +396,15 @@ def main():
     p_merge.add_argument("target", nargs="?", help="Target entity to merge INTO")
     p_merge.add_argument("--detect", action="store_true", help="Auto-detect potential duplicates")
     p_merge.set_defaults(func=cmd_merge)
+    
+    # context
+    p_ctx = sub.add_parser("context", help="Assemble token-budget-aware context for a query")
+    p_ctx.add_argument("query", help="What context to assemble")
+    p_ctx.add_argument("--budget", type=int, default=4000, help="Token budget (default: 4000)")
+    p_ctx.add_argument("--days", type=int, default=2, help="Recent daily logs to include (default: 2)")
+    p_ctx.add_argument("--max-entities", type=int, default=10, help="Max entities to load (default: 10)")
+    p_ctx.add_argument("--manifest-only", action="store_true", help="Only show manifest, not context")
+    p_ctx.set_defaults(func=cmd_context)
     
     # fix
     p_fix = sub.add_parser("fix", help="Correct entity data without re-extracting")
