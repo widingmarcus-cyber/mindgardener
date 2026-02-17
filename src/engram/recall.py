@@ -202,9 +202,9 @@ def search_graph(query: str, config: EngramConfig) -> list[str]:
         try:
             t = json.loads(line)
             # Check if query matches subject, object, or detail
-            if (query_lower in t.get("subject", "").lower() or
-                query_lower in t.get("object", "").lower() or
-                query_lower in t.get("detail", "").lower()):
+            if (query_lower in (t.get("subject") or "").lower() or
+                query_lower in (t.get("object") or "").lower() or
+                query_lower in (t.get("detail") or "").lower()):
                 matches.append(
                     f"- [{t.get('date', '?')}] {t['subject']} → {t['predicate']} → {t['object']}"
                     + (f" ({t['detail']})" if t.get("detail") else "")
