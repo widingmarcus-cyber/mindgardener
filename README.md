@@ -1,173 +1,235 @@
 # 🌱 MindGardener
 
-**Your AI agent's personal Wikipedia — automatically built and updated from daily conversations.**
+**Local-first long-term memory for autonomous agents.**
 
-Every time you chat with your agent, it mentions people, projects, tools, and events. MindGardener turns those conversations into a personal wiki — one markdown file per entity — that grows over time. Your agent remembers what happened last week, who you talked about, and what matters.
+Your agent forgets everything between sessions. MindGardener fixes that — no database, no server, just markdown files that your agent can read, search, and browse.
 
-No database needed. Just text files.
-
-## How It Stays Manageable
-
-You might wonder: won't this create thousands of files? No. MindGardener is opinionated about what it remembers:
-
-- **One file per entity.** A person, a company, a project each gets one `.md` file. Mentions across different days get merged into the same file — not duplicated.
-- **Surprise scoring decides what's worth keeping.** Not everything is interesting. MindGardener predicts what *should* have happened based on what it already knows, then compares with what *actually* happened. Only surprising things get promoted to long-term memory. Routine stuff fades.
-- **Automatic pruning.** Entities that haven't been mentioned in 30+ days get archived. Your wiki stays focused on what's active and relevant.
-- **You can edit it.** It's just markdown files in a folder. Open them in VS Code, Obsidian, or `vim`. Add facts, fix mistakes, delete things. Run `garden reindex` and the system catches up.
-
-A typical agent running for a month has 30-80 entity files. That's it — a small, browsable wiki, not a data dump.
-
-## The Problem
-
-AI agents forget everything between sessions. Current solutions:
-- **RAG / Vector DBs** — find similar text, miss causal connections
-- **Flat file memory** — grows forever, no signal/noise filtering
-- **Context window** — limited, expensive, ephemeral
-
-**Mem0** requires Neo4j. **Letta** requires a cloud account. **MindGardener** requires a folder.
-
-None of the existing solutions model how memory actually works: **consolidate the important, forget the rest.**
-
-## Why Files?
-
-- **Debug with `grep`**, not SQL queries
-- **Version with `git`** — diff your agent's learning over time
-- **Read in Obsidian** — your agent's brain is a wiki you can browse
-- **No infrastructure** — no database, no server, no account, no API key (except for the LLM)
-- **Survives anything** — `rsync`, `cp`, `tar`. Try that with a vector DB
-
-## The Graph is Free
-
-`[[WikiLinks]]` create a knowledge graph without a graph database. Each entity page links to related entities. The graph emerges from the text — no Neo4j, no schema, no migration.
-
-```markdown
-# Kadoa
-- Received reply from [[Adrian Krebs]] after [[HN]] outreach
-- [[Revenue Hunter]] sent cold email to adrian@kadoa.com
+```bash
+pip install mindgardener
+garden init
+garden extract --input memory/2026-02-17.md
 ```
 
-That's 3 edges in the graph, and you can read them with `cat`.
+Three commands. Zero infrastructure. Your agent now has persistent memory.
 
-## How MindGardener Works
+---
+
+## Why Another Memory Tool?
+
+Every agent memory solution requires infrastructure:
+
+| Tool | Requires |
+|------|----------|
+| Mem0 | Neo4j + Qdrant |
+| Letta (MemGPT) | Server + cloud account |
+| Zep / Graphiti | Postgres |
+| LangMem | Postgres |
+| **MindGardener** | **A folder** |
+
+MindGardener stores everything as markdown files. Debug with `grep`. Version with `git`. Browse in Obsidian. Back up with `cp`.
+
+No vendor lock-in. No subscription. No infrastructure to maintain.
+
+---
+
+## What It Does
+
+MindGardener reads your agent's daily conversation logs and builds a **personal wiki** — one markdown file per person, project, company, or event. It connects them with `[[wikilinks]]` to create a knowledge graph. Then it uses **surprise scoring** (prediction error) to decide what's worth remembering long-term.
 
 ```
-Daily Logs (episodic)
-     ↓ gardener extract
-Entity Pages (semantic wiki)  +  Knowledge Graph (triplets)
-     ↓ gardener surprise
-Surprise Scoring (what changed your world model?)
-     ↓ gardener consolidate  
-Long-term Memory (curated, high-confidence)
+Daily Logs → Extract → Entity Wiki + Knowledge Graph
+                          ↓
+                   Surprise Score → Consolidate → Long-Term Memory
+                                                    ↓
+                                            Context Assembly → Agent gets relevant memory
 ```
 
-### The Sleep Cycle
+### The Result
 
-Every night, MindGardener runs a "sleep cycle":
-1. **Extract** entities and relationships from today's logs
-2. **Score** events by surprise (prediction error vs world model)
-3. **Consolidate** high-surprise items into long-term memory
-4. **Decay** unreferenced entities over time
+After a month of use, your agent has:
+- **30–80 entity files** — browsable wiki pages for people, companies, projects
+- **A knowledge graph** — relationship triplets in `graph.jsonl`
+- **A curated MEMORY.md** — only the surprising, important stuff
+- **Token-budget-aware retrieval** — load exactly what fits in context
 
-### The Knowledge Graph
+---
 
-MindGardener builds a wiki-style knowledge graph from unstructured text:
+## Quick Start
 
-```
-memory/
-├── entities/
-│   ├── OpenClaw.md          # Project page with timeline
-│   ├── Adrian-Krebs.md      # Person page with context
-│   └── Kadoa.md             # Company page with relations
-├── graph.jsonl              # Triplets: subject → predicate → object
-└── surprise-scores.jsonl    # What was unexpected today?
+### Install
+
+```bash
+pip install mindgardener
 ```
 
-Each entity page is human-readable Markdown with `[[wikilinks]]`:
+### Initialize
+
+```bash
+garden init                    # Uses Google Gemini (free tier)
+garden init --provider ollama  # 100% local, 100% free
+```
+
+This creates `garden.yaml`, `memory/`, `memory/entities/`, and `MEMORY.md`.
+
+### Daily Workflow
+
+```bash
+# Your agent writes daily notes to memory/2026-02-17.md (or you do)
+
+# Extract entities and relationships
+garden extract --input memory/2026-02-17.md
+
+# Score what was surprising today
+garden surprise
+
+# Promote important events to long-term memory
+garden consolidate
+
+# Prune inactive entities (not mentioned in 30+ days)
+garden prune --days 30
+```
+
+### Retrieval
+
+```bash
+# Search entities and graph
+garden recall "Kadoa"
+
+# Token-budget-aware context assembly
+garden context "job search" --budget 4000
+
+# List all known entities
+garden entities
+
+# Visualize the knowledge graph
+garden viz --format mermaid
+```
+
+---
+
+## How Memory Actually Works
+
+### 1. Entity Extraction
+
+`garden extract` reads a daily log and creates one `.md` file per entity:
 
 ```markdown
 # Kadoa
 **Type:** company
 
 ## Facts
-- AI web scraping startup
-- Adrian Krebs works here
+- AI web scraping startup (YC W24)
 
 ## Timeline
 ### [[2026-02-16]]
-- Received reply from [[Adrian Krebs]] after HN outreach
-- [[Revenue-hunter-cron]] sent cold email
-
-## Relations
-- [[Adrian Krebs]] works_at → this
+- [[Marcus]] received reply from [[Adrian Krebs]] after [[HN]] outreach
+- [[Revenue Hunter]] sent cold email to adrian@kadoa.com
 ```
 
-## Key Concepts
+Each `[[wikilink]]` is an edge in the knowledge graph. The graph emerges from the text — no schema, no migration.
 
-### Surprise-Driven Consolidation
+### 2. Surprise Scoring
+
 Not all memories are equal. MindGardener uses **prediction error** to score importance:
-1. Feed the agent's current world model (MEMORY.md)
-2. Ask: "What do you predict happened today?"
-3. Compare prediction against reality
-4. Delta = surprise score (0.0 - 1.0)
 
-High surprise → consolidate to long-term memory. Low surprise → let it decay.
+1. Read the agent's current world model (`MEMORY.md`)
+2. Predict what should have happened today
+3. Compare prediction against what actually happened
+4. Score the delta: high surprise → important, low surprise → routine
 
-This is SOAR's impasse-driven chunking (Laird, 2012) adapted for LLM agents.
+This is how biological memory works — you remember the unexpected, not the routine. Ported from SOAR's impasse-driven chunking (Laird, 2012) to LLM agents.
 
-### Temporal Versioning
-Memories aren't facts — they're `(fact, timestamp, confidence)` tuples.
-"Applied to Klarna [Jan, 0.8]" → "Rejected by Klarna [Feb, 0.95]" — not contradiction, evolution.
+### 3. Context Assembly (v2)
 
-### Multi-Agent Shared Brain
-Multiple agents can share the same entity directory. Each contributes observations; all benefit from the combined knowledge. Symlinks or shared directories — no database required.
+`garden context` solves the "load everything" problem. Instead of dumping all memory into context, it:
 
-## Installation
+1. Scores all entities against your query (fuzzy matching, Levenshtein, initials)
+2. Follows `[[wikilinks]]` — 1-hop graph traversal to find related entities
+3. Includes matching graph triplets
+4. Adds relevant lines from recent daily logs
+5. Includes MEMORY.md excerpts
+6. **All within a token budget** — 4000 tokens? Only the most relevant. 500? Even more selective.
 
-```bash
-pip install mindgardener
+Every assembly is logged with a **manifest** — you can audit exactly what your agent knew (or didn't know) at any point:
+
+```json
+{
+  "query": "Kadoa",
+  "token_budget": 4000,
+  "tokens_used": 1847,
+  "utilization": 0.46,
+  "loaded_count": 7,
+  "skipped_count": 2,
+  "skipped_reasons": ["token_budget_exceeded"]
+}
 ```
 
-## Quick Start
+---
 
-```bash
-# Extract entities from today's log
-garden extract --input memory/2026-02-17.md
+## All 13 Commands
 
-# Run surprise scoring
-garden surprise --memory MEMORY.md --today memory/2026-02-17.md
+| Command | What it does | LLM? | Cost |
+|---------|-------------|------|------|
+| `garden init` | Set up workspace | No | Free |
+| `garden extract` | Daily log → entity wiki + graph | Yes | ~$0.001 |
+| `garden surprise` | Score events by prediction error | Yes | ~$0.002 |
+| `garden consolidate` | Promote high-surprise → MEMORY.md | Yes | ~$0.001 |
+| `garden recall "q"` | Search entities + graph | No | Free |
+| `garden context "q"` | Token-budget context assembly | No | Free |
+| `garden entities` | List all known entities | No | Free |
+| `garden prune` | Archive inactive entities | No | Free |
+| `garden merge "a" "b"` | Merge duplicate entities | No | Free |
+| `garden fix type "X" "t"` | Fix entity type mistakes | No | Free |
+| `garden reindex` | Rebuild graph from entity files | No | Free |
+| `garden viz` | Mermaid graph visualization | No | Free |
+| `garden stats` | Quick overview | No | Free |
 
-# Consolidate high-surprise items to long-term memory
-garden consolidate
+Only 3 commands call an LLM. The other 10 are pure file operations.
 
-# Backfill historical files
-garden backfill --dir memory/
+---
 
-# Visualize the knowledge graph
-garden viz --format mermaid
+## LLM Providers
+
+MindGardener works with any LLM. Configure in `garden.yaml`:
+
+```yaml
+extraction:
+  provider: google       # Google Gemini (free tier: 1500 req/day)
+  model: gemini-2.0-flash
 ```
+
+| Provider | Config | Cost |
+|----------|--------|------|
+| Google Gemini | `provider: google` | Free tier available |
+| OpenAI | `provider: openai` | From $0.15/1M tokens |
+| Anthropic | `provider: anthropic` | From $0.25/1M tokens |
+| Ollama (local) | `provider: ollama` | Free |
+| Any OpenAI-compatible | `provider: compatible` + `base_url` | Varies |
+
+**Daily cost running full nightly cycle:** ~$0.004/day with Gemini Flash. ~$0.12/month. $0 with Ollama.
+
+---
 
 ## Configuration
 
 ```yaml
 # garden.yaml
-workspace: /path/to/agent/workspace
+workspace: /path/to/workspace
 memory_dir: memory/
 entities_dir: memory/entities/
 graph_file: memory/graph.jsonl
 long_term_memory: MEMORY.md
 
 extraction:
-  model: gemini-2.0-flash  # Cheap model for extraction
-  provider: google          # google, openai, anthropic
+  provider: google
+  model: gemini-2.0-flash
 
 consolidation:
-  surprise_threshold: 0.5   # Min score to consolidate
-  decay_days: 30            # Days before archiving unreferenced entities
-  
-schedule:
-  extract: "0 3 * * *"     # Nightly at 3 AM
-  backfill: "15 * * * *"   # One file per hour
+  surprise_threshold: 0.5   # Min score to promote
+  decay_days: 30             # Archive after N days inactive
 ```
+
+---
 
 ## Architecture
 
@@ -188,53 +250,121 @@ schedule:
                                           │  Consolidator    │
                                           │ (→ MEMORY.md)    │
                                           └─────────────────┘
+                                                   │
+                                                   ▼
+                                          ┌─────────────────┐
+                                          │ Context Assembly  │
+                                          │ (budget-aware)    │
+                                          └─────────────────┘
 ```
+
+---
 
 ## Comparison
 
-| | **MindGardener** | **Letta Code** | **Mem0** | **LangMem** |
-|---|---|---|---|---|
-| CLI-first | ✅ `garden` | ✅ `letta` | ❌ SDK | ❌ SDK |
-| Storage | Files (Markdown) | Server DB | Neo4j + Qdrant | Postgres |
-| Human-readable | ✅ Markdown | ❌ | ❌ | ❌ |
-| Knowledge graph | ✅ JSONL | ❌ | ✅ Neo4j | ❌ |
-| Surprise scoring | ✅ PE engine | ❌ | ❌ | ❌ |
-| Sleep cycle | ✅ consolidate | ✅ sleeptime | ❌ | ⚠️ |
-| Zero infrastructure | ✅ | ❌ server | ❌ 2 DBs | ❌ Postgres |
-| Manual edit | ✅ any editor | ⚠️ /remember | ❌ | ❌ |
-| Framework lock-in | None | Letta | Mem0 SDK | LangChain |
-| Offline capable | ✅ (with local LLM) | ❌ | ❌ | ❌ |
+| | **MindGardener** | **Mem0** | **Letta** | **Zep/Graphiti** | **Cognee** |
+|---|---|---|---|---|---|
+| Infrastructure | **None** | Neo4j + Qdrant | Cloud server | Postgres | Heavy |
+| Storage format | **Markdown** | Opaque | Opaque | Opaque | Opaque |
+| Human-readable | **Yes** | No | No | No | No |
+| Knowledge graph | **Wikilinks + JSONL** | Neo4j | No | Graph DB | Graph |
+| Surprise scoring | **Yes** | No | No | No | No |
+| Token-budget retrieval | **Yes** | No | No | No | No |
+| Context manifests | **Yes** | No | No | No | No |
+| Manual editing | **Any editor** | No | /remember | No | No |
+| Browse in Obsidian | **Yes** | No | No | No | No |
+| Offline capable | **Yes (Ollama)** | No | No | No | No |
+| Framework lock-in | **None** | Mem0 SDK | Letta SDK | Zep SDK | Cognee SDK |
+| Install | `pip install` | Docker + DBs | Cloud signup | Docker + DB | pip + deps |
 
-**Use case:** "I just want my agent to remember yesterday — without deploying a database."
+---
+
+## Dependencies
+
+- Python 3.10+
+- PyYAML
+- An LLM provider
+
+That's it. No numpy. No torch. No vector database. No Docker.
+
+Install size: <500KB.
+
+---
+
+## Testing
+
+```bash
+$ python -m pytest tests/ -q
+120 passed in 2.34s
+```
+
+120 tests. All run in <3 seconds. No network calls (all mocked).
+
+---
+
+## File Structure
+
+```
+your-workspace/
+├── garden.yaml                      # Config
+├── MEMORY.md                        # Long-term curated memory
+└── memory/
+    ├── 2026-02-17.md                # Daily log (episodic)
+    ├── 2026-02-16.md
+    ├── graph.jsonl                   # Knowledge graph triplets
+    ├── surprise-scores.jsonl         # What was unexpected
+    ├── context-manifests.jsonl       # Audit trail
+    └── entities/
+        ├── Marcus.md                # Person
+        ├── Kadoa.md                 # Company
+        ├── MindGardener.md          # Project
+        └── Adrian-Krebs.md          # Person
+```
+
+Everything is a text file. Everything is `grep`-able. Everything is `git`-able.
+
+---
+
+## Multi-Agent Support
+
+Multiple agents can share the same entity directory. Each contributes observations; all benefit from combined knowledge. Use symlinks or shared directories — no coordination server needed.
+
+---
 
 ## Research Background
 
-MindGardener is informed by cognitive science research on memory consolidation:
+MindGardener draws from cognitive science research on memory:
 
 - **Tulving (1972)** — Episodic vs semantic memory distinction
 - **SOAR (Laird, 2012)** — Impasse-driven chunking for procedural learning
 - **Generative Agents (Park et al., 2023)** — Reflection-based agent memory
 - **CoALA (Sumers et al., 2023)** — Formal taxonomy of agent memory architectures
-- **GraphRAG (Edge et al., 2024)** — Graph + vector hybrid retrieval
 - **MemGPT (Packer et al., 2023)** — OS-inspired hierarchical memory management
+- **Everything is Context (Xu et al., 2025)** — Filesystem abstraction for context engineering
 
-**Novel contribution:** Surprise-based consolidation using prediction error — porting SOAR's impasse detection to LLM agents. No prior work has implemented this.
+**Novel contribution:** Surprise-based consolidation using prediction error, and token-budget-aware context assembly with audit manifests.
+
+---
 
 ## Roadmap
 
 - [x] Entity extraction from markdown logs
-- [x] Wiki-style page generation with wikilinks
-- [x] Triplet-based knowledge graph
+- [x] Wiki-style pages with `[[wikilinks]]`
+- [x] Knowledge graph (JSONL triplets)
 - [x] Surprise scoring (prediction error)
+- [x] Token-budget-aware context assembly
+- [x] Context manifests (audit trail)
+- [x] Multi-provider LLM support (5 providers)
 - [x] Multi-agent shared brain
-- [x] Backfill historical files
-- [ ] Temporal decay + archiving
-- [ ] Graph traversal queries (1-hop, 2-hop)
-- [ ] Conflict resolution for contradictory facts
-- [ ] Provider-agnostic LLM calls (OpenAI, Anthropic, Google, local)
-- [ ] pip package + CLI
-- [ ] Obsidian plugin for visualization
-- [ ] Benchmark against standard RAG
+- [x] 120 tests
+- [ ] Concurrency safety (file locks)
+- [ ] Optional embedding plugin
+- [ ] Incremental indexing
+- [ ] Background daemon mode
+- [ ] Context evaluator (fact-checking loop)
+- [ ] pip package on PyPI
+
+---
 
 ## License
 
@@ -242,4 +372,4 @@ MIT
 
 ## Credits
 
-Built by the [Swarm](https://github.com/widingmarcus-cyber/discord-agent-swarm) — a team of 4 autonomous AI agents coordinating via Discord.
+Built by the [Swarm](https://github.com/widingmarcus-cyber/discord-agent-swarm) — a team of autonomous AI agents coordinating via Discord.
