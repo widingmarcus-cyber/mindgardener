@@ -1,8 +1,8 @@
 # 🌱 MindGardener
 
-**Long-term memory for AI agents.**
+**Your AI agent's personal Wikipedia — automatically built and updated from daily conversations.**
 
-Your agent forgets everything between sessions. MindGardener fixes that — it reads your agent's daily logs and automatically builds a wiki of everyone and everything it encounters. No database needed. Just text files.
+Every time you chat with your agent, it learns about people, projects, and events. MindGardener turns those conversations into a personal wiki that grows over time. Your agent remembers what happened last week, who you talked about, and what matters. No database needed. Just text files.
 
 ## The Problem
 
