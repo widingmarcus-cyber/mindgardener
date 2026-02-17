@@ -1,108 +1,79 @@
 # 🌱 MindGardener
 
-**Local-first long-term memory for autonomous agents.**
-
-Your agent forgets everything between sessions. MindGardener fixes that — no database, no server, just markdown files that your agent can read, search, and browse.
+**Your agents forget everything. This fixes it.**
 
 ```bash
 pip install mindgardener
 garden init
-garden extract --input memory/2026-02-17.md
 ```
 
-Three commands. Zero infrastructure. Your agent now has persistent memory.
+That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
 ---
 
-## Why Another Memory Tool?
+## The Problem
 
-Every agent memory solution requires infrastructure:
+Every AI agent wakes up with amnesia. You talked for two hours about your job search, your projects, your contacts — next session, gone.
 
-| Tool | Requires |
-|------|----------|
+Current solutions all require infrastructure you don't want to maintain:
+
+| Tool | You need to run |
+|------|----------------|
 | Mem0 | Neo4j + Qdrant |
-| Letta (MemGPT) | Server + cloud account |
+| Letta (MemGPT) | Cloud server + account |
 | Zep / Graphiti | Postgres |
 | LangMem | Postgres |
-| **MindGardener** | **A folder** |
+| **MindGardener** | **Nothing** |
 
-MindGardener stores everything as markdown files. Debug with `grep`. Version with `git`. Browse in Obsidian. Back up with `cp`.
+## The Fix
 
-No vendor lock-in. No subscription. No infrastructure to maintain.
+MindGardener reads your agent's conversation logs and builds a personal wiki — one markdown file per person, project, and event. It decides what's worth remembering using **surprise scoring** (prediction error), not "rate importance 1-10."
+
+Your agent's memory is just a folder of files. `grep` it. `git diff` it. Open it in Obsidian. Back it up with `cp`.
 
 ---
 
-## What It Does
+## What You Get
 
-MindGardener reads your agent's daily conversation logs and builds a **personal wiki** — one markdown file per person, project, company, or event. It connects them with `[[wikilinks]]` to create a knowledge graph. Then it uses **surprise scoring** (prediction error) to decide what's worth remembering long-term.
-
-```
-Daily Logs → Extract → Entity Wiki + Knowledge Graph
-                          ↓
-                   Surprise Score → Consolidate → Long-Term Memory
-                                                    ↓
-                                            Context Assembly → Agent gets relevant memory
-```
-
-### The Result
-
-After a month of use, your agent has:
-- **30–80 entity files** — browsable wiki pages for people, companies, projects
-- **A knowledge graph** — relationship triplets in `graph.jsonl`
-- **A curated MEMORY.md** — only the surprising, important stuff
-- **Token-budget-aware retrieval** — load exactly what fits in context
+After a month, your agent has:
+- **30–80 entity files** — one per person, company, project (`memory/entities/Kadoa.md`)
+- **A knowledge graph** — `[[wikilinks]]` + triplets, no database needed
+- **Curated long-term memory** — only the surprising stuff survives
+- **Token-budget retrieval** — `garden context "topic" --budget 4000` loads exactly what fits
+- **Identity model** — tracks *who your agent thinks you are* and updates when beliefs shift
 
 ---
 
 ## Quick Start
 
-### Install
-
 ```bash
 pip install mindgardener
+garden init                              # Set up workspace
+garden extract --input memory/today.md   # Build entity wiki from logs
+garden context "job search" --budget 4000 # Get relevant memory, within budget
 ```
 
-### Initialize
+For fully local (no API key): `garden init --provider ollama`
+
+### The Nightly Sleep Cycle
+
+Run this on a cron (or manually). It's your agent's equivalent of sleep:
 
 ```bash
-garden init                    # Uses Google Gemini (free tier)
-garden init --provider ollama  # 100% local, 100% free
+garden extract    # Read today's logs → create/update entity wiki pages
+garden surprise   # Score events by prediction error (what was unexpected?)
+garden consolidate # Promote high-surprise events to MEMORY.md
+garden beliefs --drift --apply  # Update identity model if beliefs shifted
+garden prune --days 30          # Archive entities inactive >30 days
 ```
 
-This creates `garden.yaml`, `memory/`, `memory/entities/`, and `MEMORY.md`.
-
-### Daily Workflow
+### Retrieval (no LLM needed)
 
 ```bash
-# Your agent writes daily notes to memory/2026-02-17.md (or you do)
-
-# Extract entities and relationships
-garden extract --input memory/2026-02-17.md
-
-# Score what was surprising today
-garden surprise
-
-# Promote important events to long-term memory
-garden consolidate
-
-# Prune inactive entities (not mentioned in 30+ days)
-garden prune --days 30
-```
-
-### Retrieval
-
-```bash
-# Search entities and graph
-garden recall "Kadoa"
-
-# Token-budget-aware context assembly
-garden context "job search" --budget 4000
-
-# List all known entities
-garden entities
-
-# Visualize the knowledge graph
-garden viz --format mermaid
+garden recall "Kadoa"                     # Search entities + graph
+garden context "job search" --budget 4000  # Token-budget assembly
+garden evaluate --text "Agent said X"      # Fact-check against knowledge graph
+garden beliefs                             # View identity model
 ```
 
 ---
