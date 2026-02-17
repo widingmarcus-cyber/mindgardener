@@ -18,18 +18,29 @@ from .config import EngramConfig
 from .recall import fuzzy_score, extract_wikilinks, search_graph
 
 
+CHARS_PER_TOKEN = 4
+
+
 def estimate_tokens(text: str) -> int:
     """Rough token estimate: ~4 chars per token for English."""
-    return len(text) // 4
+    return max(1, len(text) // CHARS_PER_TOKEN) if text is not None else 1
+
+
+# Aliases for test compatibility
+_estimate_tokens = estimate_tokens
 
 
 def assemble_context(
     query: str,
     config: EngramConfig,
     token_budget: int = 4000,
+    budget_tokens: int | None = None,  # Alias for token_budget
     include_recent_days: int = 2,
     max_entities: int = 10,
     max_hops: int = 1,
+    hops: int | None = None,  # Alias for max_hops
+    include_graph: bool = True,
+    include_memory: bool = True,
 ) -> dict:
     """Assemble context for a query within a token budget.
     
@@ -46,6 +57,12 @@ def assemble_context(
             }
         }
     """
+    # Resolve aliases
+    if budget_tokens is not None:
+        token_budget = budget_tokens
+    if hops is not None:
+        max_hops = hops
+    
     manifest_loaded = []
     manifest_skipped = []
     context_parts = []
@@ -117,7 +134,7 @@ def assemble_context(
                     })
     
     # --- Phase 3: Graph connections ---
-    graph_results = search_graph(query, config)
+    graph_results = search_graph(query, config) if include_graph else []
     if graph_results:
         graph_text = "\n".join(graph_results[:10])
         est = estimate_tokens(graph_text)
@@ -181,7 +198,7 @@ def assemble_context(
                     })
     
     # --- Phase 5: Long-term memory (MEMORY.md) ---
-    if config.long_term_memory.exists():
+    if include_memory and config.long_term_memory.exists():
         ltm_content = config.long_term_memory.read_text()
         est = estimate_tokens(ltm_content)
         if tokens_used + est <= token_budget:
@@ -297,3 +314,42 @@ def _log_manifest(config: EngramConfig, manifest: dict):
             f.write(json.dumps(manifest) + "\n")
     except OSError:
         pass  # Non-critical
+
+
+# --- Compatibility layer for Sven's tests ---
+
+class ContextResult:
+    """Simple result container."""
+    def __init__(self, context: str, manifest: dict):
+        self.context = context
+        self.manifest = manifest
+        self.tokens_used = manifest.get("tokens_used", 0)
+        self.loaded = manifest.get("loaded", [])
+        self.skipped = manifest.get("skipped", [])
+
+
+def _score_entity(query: str, name: str, content: str, query_words: set) -> float:
+    """Score a single entity against query. Test-compatible wrapper."""
+    from .recall import fuzzy_score
+    name_score = fuzzy_score(query, name)
+    content_score = 0.0
+    query_lower = query.lower()
+    if query_lower in content.lower():
+        content_score = 0.5
+    elif any(w in content.lower() for w in query_words if len(w) >= 3):
+        content_score = 0.1
+    return max(name_score, content_score)
+
+
+def _score_daily(query: str, content: str, query_words: set, days_ago: int = 0) -> float:
+    """Score daily log relevance. Test-compatible wrapper."""
+    query_lower = query.lower()
+    score = 0.0
+    if query_lower in content.lower():
+        score = 0.5
+    elif any(w in content.lower() for w in query_words if len(w) >= 3):
+        score = 0.3
+    # Recency decay
+    if days_ago > 0:
+        score *= max(0.1, 1.0 - (days_ago * 0.15))
+    return score
