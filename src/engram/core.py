@@ -27,6 +27,8 @@ import urllib.request
 from datetime import datetime, date
 from pathlib import Path
 
+from .filelock import file_lock, safe_write, safe_append
+
 # Configuration — each agent sets its own workspace
 WORKSPACE = Path(os.environ.get("GARDENER_WORKSPACE", "/root/clawd"))
 MEMORY_DIR = WORKSPACE / "memory"
@@ -218,7 +220,7 @@ def update_entity_file(name: str, entity_type: str, facts: list,
         
         if timeline_entry.count('\n') > 1:  # Has content beyond header
             content = '\n'.join(lines) + timeline_entry + '\n'
-            filepath.write_text(content)
+            safe_write(filepath, content)
             print(f"  Updated: {filename}.md")
     else:
         # Create new entity file
@@ -253,7 +255,7 @@ def update_entity_file(name: str, entity_type: str, facts: list,
         for r in sorted(related):
             content += f"- [[{r}]]\n"
         
-        filepath.write_text(content)
+        safe_write(filepath, content)
         print(f"  Created: {filename}.md")
 
 
@@ -270,14 +272,15 @@ def append_to_graph(triplets: list, date_str: str):
                     pass
     
     new_count = 0
-    with open(GRAPH_FILE, "a") as f:
-        for t in triplets:
-            key = (date_str, t["subject"], t["predicate"], t["object"])
-            if key not in existing:
-                t["date"] = date_str
-                t["timestamp"] = datetime.now().isoformat()
-                f.write(json.dumps(t) + "\n")
-                new_count += 1
+    with file_lock(GRAPH_FILE):
+        with open(GRAPH_FILE, "a") as f:
+            for t in triplets:
+                key = (date_str, t["subject"], t["predicate"], t["object"])
+                if key not in existing:
+                    t["date"] = date_str
+                    t["timestamp"] = datetime.now().isoformat()
+                    f.write(json.dumps(t) + "\n")
+                    new_count += 1
     
     if new_count:
         print(f"  Added {new_count} new triplets to graph.jsonl")
@@ -461,11 +464,12 @@ def run_surprise(date_str: str):
             print(f"  {emoji} [{score:.1f}] {s['event']}")
             print(f"       {s['reason']}")
         
-        with open(SURPRISE_FILE, "a") as f:
-            for s in result["surprises"]:
-                s["date"] = date_str
-                s["timestamp"] = datetime.now().isoformat()
-                f.write(json.dumps(s) + "\n")
+        with file_lock(SURPRISE_FILE):
+            with open(SURPRISE_FILE, "a") as f:
+                for s in result["surprises"]:
+                    s["date"] = date_str
+                    s["timestamp"] = datetime.now().isoformat()
+                    f.write(json.dumps(s) + "\n")
     else:
         print(f"No surprises for {date_str}")
 
@@ -487,8 +491,9 @@ def run_consolidate():
     if result:
         # Result might be raw text, not JSON
         update_text = result if isinstance(result, str) else json.dumps(result, indent=2)
-        with open(MEMORY_FILE, "a") as f:
-            f.write(f"\n\n{update_text}\n")
+        with file_lock(MEMORY_FILE):
+            with open(MEMORY_FILE, "a") as f:
+                f.write(f"\n\n{update_text}\n")
         print(f"MEMORY.md updated with consolidation from {today}")
 
 

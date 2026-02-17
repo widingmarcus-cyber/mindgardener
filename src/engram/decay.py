@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
+from .filelock import safe_write, file_lock
+
 
 @dataclass
 class DecayConfig:
@@ -87,7 +89,7 @@ def increment_access(entity_path: Path):
             count=1
         )
     
-    entity_path.write_text(content)
+    safe_write(entity_path, content)
 
 
 def scan_health(entities_dir: Path, config: DecayConfig | None = None) -> list[EntityHealth]:
@@ -211,7 +213,7 @@ def _mark_graph_stale(graph_file: Path, entity_name: str):
         except:
             updated.append(line)
     
-    graph_file.write_text('\n'.join(updated) + '\n')
+    safe_write(graph_file, '\n'.join(updated) + '\n')
 
 
 def restore_entity(entities_dir: Path, entity_name: str) -> str:

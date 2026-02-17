@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import Optional
 
+from .filelock import safe_write
+
 
 def load_aliases(entities_dir: Path) -> dict[str, str]:
     """Load alias mappings from entities/.aliases.json.
@@ -25,7 +27,7 @@ def load_aliases(entities_dir: Path) -> dict[str, str]:
 def save_aliases(entities_dir: Path, aliases: dict[str, str]):
     """Save alias mappings."""
     alias_file = entities_dir / ".aliases.json"
-    alias_file.write_text(json.dumps(aliases, indent=2) + "\n")
+    safe_write(alias_file, json.dumps(aliases, indent=2) + "\n")
 
 
 def resolve_name(name: str, aliases: dict[str, str]) -> str:
@@ -94,11 +96,11 @@ def merge_entities(entities_dir: Path, source: str, target: str):
                 f"\n**Also known as:** {source}\n\n## Timeline"
             )
         
-        target_file.write_text(target_content)
+        safe_write(target_file, target_content)
     else:
         # Just rename the file and update header
         source_content = source_content.replace(f"# {source}", f"# {target}\n**Also known as:** {source}")
-        target_file.write_text(source_content)
+        safe_write(target_file, source_content)
     
     # Remove source file
     source_file.unlink()

@@ -13,6 +13,8 @@ import re
 import shutil
 from pathlib import Path
 
+from .filelock import safe_write
+
 
 def fix_type(entities_dir: Path, entity_name: str, new_type: str) -> str:
     """Change an entity's type."""
@@ -34,7 +36,7 @@ def fix_type(entities_dir: Path, entity_name: str, new_type: str) -> str:
     old = re.search(r'\*\*Type:\*\*\s*\w+', content)
     if old:
         content = content.replace(old.group(), f"**Type:** {new_type}")
-        filepath.write_text(content)
+        safe_write(filepath, content)
         return f"Updated {filepath.stem}: type → {new_type}"
     else:
         return f"No type field found in {filepath.stem}"
@@ -57,7 +59,7 @@ def fix_name(entities_dir: Path, old_name: str, new_name: str) -> str:
     
     content = old_path.read_text()
     content = content.replace(f"# {old_name}", f"# {new_name}", 1)
-    new_path.write_text(content)
+    safe_write(new_path, content)
     old_path.unlink()
     
     return f"Renamed: {old_name} → {new_name}"
@@ -92,7 +94,7 @@ def add_fact(entities_dir: Path, entity_name: str, fact: str) -> str:
         else:
             content += f"\n## Facts\n- {fact}\n"
     
-    filepath.write_text(content)
+    safe_write(filepath, content)
     return f"Added fact to {filepath.stem}: {fact}"
 
 
@@ -117,7 +119,7 @@ def remove_fact(entities_dir: Path, entity_name: str, fact_substring: str) -> st
         new_lines.append(line)
     
     if removed:
-        filepath.write_text('\n'.join(new_lines))
+        safe_write(filepath, '\n'.join(new_lines))
         return f"Removed fact containing '{fact_substring}' from {filepath.stem}"
     else:
         return f"No fact matching '{fact_substring}' found in {filepath.stem}"
