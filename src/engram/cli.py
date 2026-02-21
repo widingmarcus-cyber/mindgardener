@@ -172,27 +172,17 @@ def cmd_entities(args):
 def cmd_prune(args):
     """Archive stale entities, show what's going cold."""
     cfg = load_config(args.config)
-    from .decay import DecayConfig, scan_stale, archive_entity
+    from .decay import DecayConfig, run_decay
     
     dc = DecayConfig(archive_after_days=args.days)
-    stale = scan_stale(cfg.entities_dir, dc)
-    
-    if not stale:
-        print("🟢 No stale entities. Knowledge graph is fresh.")
-        return
-    
-    print(f"🔍 Found {len(stale)} stale entities (>{args.days} days inactive):")
-    for entity in stale:
-        print(f"  ⚠️  {entity['name']} — last referenced {entity.get('days_inactive', '?')} days ago")
-    
-    if args.dry_run:
-        print(f"\nDry run — would archive {len(stale)} entities to memory/entities/archive/")
-    else:
-        archived = 0
-        for entity in stale:
-            if archive_entity(cfg.entities_dir, entity['name']):
-                archived += 1
-        print(f"\n📦 Archived {archived} entities to memory/entities/archive/")
+    actions = run_decay(
+        cfg.entities_dir,
+        graph_file=cfg.graph_file,
+        config=dc,
+        dry_run=args.dry_run
+    )
+    for action in actions:
+        print(action)
 
 
 def cmd_merge(args):
