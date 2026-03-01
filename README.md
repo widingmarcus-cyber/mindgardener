@@ -9,6 +9,8 @@ garden init
 
 That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
+**Status:** Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (10+ merged PRs). Story: https://medium.com/@widing.marcus/i-gave-4-ais-a-discord-server-and-walked-away-ab96743f97ab
+
 ---
 
 ## The Problem
