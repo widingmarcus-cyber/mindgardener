@@ -1,241 +1,162 @@
+#!/usr/bin/env python3
 """
-Temporal Decay — Auto-archives stale entities and reinforces active ones.
+Temporal decay for MindGardener facts.
 
-Neuroscience parallel: Memories that aren't recalled fade. Memories that are
-frequently accessed get strengthened. This is Hebbian learning applied to
-the knowledge graph.
-
-Mechanism:
-1. Track last_accessed and access_count per entity (in frontmatter)
-2. Entities not referenced in N days → moved to archive/
-3. Entities accessed frequently → boosted in recall ranking
-4. Graph triplets involving archived entities → marked stale
+Facts lose relevance over time unless reinforced.
 """
-
-from __future__ import annotations
 
 import json
+import math
 import os
-import re
-import shutil
-from dataclasses import dataclass
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from .filelock import safe_write, file_lock
+from .filelock import file_lock
 
 
-@dataclass
-class DecayConfig:
-    archive_after_days: int = 30       # Archive if not referenced in N days
-    stale_warning_days: int = 14       # Warn about entities going stale
-    min_timeline_entries: int = 1      # Don't archive entities with many entries
-    protected_types: list[str] = None  # Entity types that never decay
-
-    def __post_init__(self):
-        if self.protected_types is None:
-            self.protected_types = ["project", "tool"]  # Active things shouldn't decay
+# Default decay rate (half-life in days)
+DEFAULT_HALF_LIFE = 30  # Facts lose 50% relevance every 30 days
 
 
-@dataclass
-class EntityHealth:
-    """Health status of an entity."""
-    name: str
-    file: Path
-    entity_type: str
-    last_referenced: date | None  # Most recent date in timeline
-    timeline_entries: int
-    days_stale: int              # Days since last reference
-    status: str                  # "active" | "stale" | "archive_candidate"
-    access_count: int = 0
-
-
-def parse_last_date(content: str) -> date | None:
-    """Extract the most recent date from timeline entries."""
-    dates = re.findall(r'### \[\[(\d{4}-\d{2}-\d{2})\]\]', content)
-    if not dates:
-        return None
-    return date.fromisoformat(max(dates))
-
-
-def parse_entity_type(content: str) -> str:
-    """Extract entity type from frontmatter."""
-    match = re.search(r'\*\*Type:\*\*\s*(\w+)', content)
-    return match.group(1) if match else "unknown"
-
-
-def get_access_count(content: str) -> int:
-    """Extract access count from frontmatter (if tracked)."""
-    match = re.search(r'\*\*Accessed:\*\*\s*(\d+)', content)
-    return int(match.group(1)) if match else 0
-
-
-def increment_access(entity_path: Path):
-    """Increment access counter on an entity file."""
-    if not entity_path.exists():
-        return
-    
-    content = entity_path.read_text()
-    count = get_access_count(content)
-    
-    if "**Accessed:**" in content:
-        content = re.sub(r'\*\*Accessed:\*\*\s*\d+', f'**Accessed:** {count + 1}', content)
-    else:
-        # Add after Type line
-        content = re.sub(
-            r'(\*\*Type:\*\*.*)',
-            rf'\1\n**Accessed:** {count + 1}',
-            content,
-            count=1
-        )
-    
-    safe_write(entity_path, content)
-
-
-def scan_health(entities_dir: Path, config: DecayConfig | None = None) -> list[EntityHealth]:
-    """Scan all entities and assess their health."""
-    if config is None:
-        config = DecayConfig()
-    
-    today = date.today()
-    results = []
-    
-    for f in sorted(entities_dir.glob("*.md")):
-        content = f.read_text()
-        entity_type = parse_entity_type(content)
-        last_ref = parse_last_date(content)
-        timeline_entries = len(re.findall(r'### \[\[', content))
-        access_count = get_access_count(content)
-        
-        if last_ref:
-            days_stale = (today - last_ref).days
-        else:
-            days_stale = 999  # No dates = very stale
-        
-        # Determine status
-        if entity_type in config.protected_types:
-            status = "protected"
-        elif days_stale >= config.archive_after_days:
-            status = "archive_candidate"
-        elif days_stale >= config.stale_warning_days:
-            status = "stale"
-        else:
-            status = "active"
-        
-        results.append(EntityHealth(
-            name=f.stem.replace('-', ' '),
-            file=f,
-            entity_type=entity_type,
-            last_referenced=last_ref,
-            timeline_entries=timeline_entries,
-            days_stale=days_stale,
-            status=status,
-            access_count=access_count,
-        ))
-    
-    return results
-
-
-def run_decay(entities_dir: Path, graph_file: Path | None = None,
-              config: DecayConfig | None = None,
-              dry_run: bool = True) -> list[str]:
+def calculate_decay(
+    timestamp: str,
+    half_life_days: float = DEFAULT_HALF_LIFE,
+    reinforcements: int = 0,
+) -> float:
     """
-    Run the decay cycle.
+    Calculate decay factor for a fact.
     
-    1. Scan entities for staleness
-    2. Archive entities past the threshold
-    3. Mark graph triplets as stale
+    Returns value 0.0-1.0 where 1.0 is fresh and 0.0 is fully decayed.
     
-    Returns list of actions taken.
+    Reinforcements slow decay (each reinforcement adds to effective age).
     """
-    if config is None:
-        config = DecayConfig()
+    try:
+        ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except:
+        return 1.0  # Can't parse, assume fresh
     
-    archive_dir = entities_dir / "archive"
-    health = scan_health(entities_dir, config)
-    actions = []
+    age_days = (datetime.now(ts.tzinfo) - ts).total_seconds() / 86400
     
-    # Report
-    active = [e for e in health if e.status == "active"]
-    stale = [e for e in health if e.status == "stale"]
-    candidates = [e for e in health if e.status == "archive_candidate"]
-    protected = [e for e in health if e.status == "protected"]
+    # Reinforcements extend effective freshness
+    effective_half_life = half_life_days * (1 + 0.5 * reinforcements)
     
-    actions.append(f"📊 Health scan: {len(active)} active, {len(stale)} stale, "
-                   f"{len(candidates)} archive candidates, {len(protected)} protected")
+    # Exponential decay: score = 0.5 ^ (age / half_life)
+    decay = math.pow(0.5, age_days / effective_half_life)
     
-    # Warn about stale entities
-    for e in stale:
-        actions.append(f"⚠️ Stale ({e.days_stale}d): {e.name} ({e.entity_type})")
-    
-    # Archive candidates
-    for e in candidates:
-        if e.timeline_entries > config.min_timeline_entries:
-            # Rich entities get a longer grace period
-            if e.days_stale < config.archive_after_days * 2:
-                actions.append(f"⏳ Grace period: {e.name} ({e.timeline_entries} entries, {e.days_stale}d stale)")
-                continue
-        
-        if dry_run:
-            actions.append(f"🗄️ Would archive: {e.name} ({e.days_stale}d stale)")
-        else:
-            archive_dir.mkdir(exist_ok=True)
-            dest = archive_dir / e.file.name
-            shutil.move(str(e.file), str(dest))
-            actions.append(f"🗄️ Archived: {e.name} → archive/")
-            
-            # Mark graph triplets as stale
-            if graph_file and graph_file.exists():
-                _mark_graph_stale(graph_file, e.name)
-    
-    if not stale and not candidates:
-        actions.append("✅ All entities healthy")
-    
-    return actions
+    return max(0.0, min(1.0, decay))
 
 
-def _mark_graph_stale(graph_file: Path, entity_name: str):
-    """Mark graph triplets involving an archived entity."""
-    lines = graph_file.read_text().strip().split('\n')
-    updated = []
+def score_fact(fact: dict, half_life_days: float = DEFAULT_HALF_LIFE) -> float:
+    """
+    Calculate overall score for a fact.
     
-    for line in lines:
+    Combines:
+    - Confidence (from provenance)
+    - Decay (from timestamp)
+    - Reinforcement count
+    """
+    provenance = fact.get("provenance", {})
+    confidence = provenance.get("confidence", 0.8)
+    timestamp = provenance.get("timestamp", "")
+    reinforcements = fact.get("reinforcements", 0)
+    
+    decay = calculate_decay(timestamp, half_life_days, reinforcements)
+    
+    # Combined score: confidence * decay
+    return confidence * decay
+
+
+def apply_decay_to_graph(
+    graph_file: Path,
+    half_life_days: float = DEFAULT_HALF_LIFE,
+    dry_run: bool = True,
+) -> list[dict]:
+    """
+    Apply decay scoring to all facts in graph.
+    
+    Returns list of facts with their decay scores.
+    """
+    if not graph_file.exists():
+        return []
+    
+    scored_facts = []
+    
+    for line in graph_file.read_text().strip().split('\n'):
         if not line:
             continue
         try:
-            t = json.loads(line)
-            name_lower = entity_name.lower()
-            if (t.get("subject", "").lower() == name_lower or 
-                t.get("object", "").lower() == name_lower):
-                t["stale"] = True
-                t["archived_at"] = datetime.now().isoformat()
-            updated.append(json.dumps(t))
+            fact = json.loads(line)
+            score = score_fact(fact, half_life_days)
+            fact["_decay_score"] = round(score, 3)
+            scored_facts.append(fact)
         except:
-            updated.append(line)
+            continue
     
-    safe_write(graph_file, '\n'.join(updated) + '\n')
+    # Sort by score (lowest first = most decayed)
+    scored_facts.sort(key=lambda f: f.get("_decay_score", 0))
+    
+    return scored_facts
 
 
-def restore_entity(entities_dir: Path, entity_name: str) -> str:
-    """Restore an archived entity."""
-    archive_dir = entities_dir / "archive"
+def prune_decayed(
+    graph_file: Path,
+    threshold: float = 0.1,
+    half_life_days: float = DEFAULT_HALF_LIFE,
+    dry_run: bool = True,
+) -> tuple[int, int]:
+    """
+    Remove facts below decay threshold.
     
-    # Find the file
-    from .core import sanitize_filename
-    filename = sanitize_filename(entity_name) + ".md"
-    archived = archive_dir / filename
+    Returns (kept_count, pruned_count).
+    """
+    scored = apply_decay_to_graph(graph_file, half_life_days, dry_run=True)
     
-    if not archived.exists():
-        # Try fuzzy match
-        candidates = list(archive_dir.glob("*.md"))
-        matches = [c for c in candidates if entity_name.lower() in c.stem.lower()]
-        if matches:
-            archived = matches[0]
-        else:
-            return f"Entity '{entity_name}' not found in archive"
+    keep = [f for f in scored if f.get("_decay_score", 0) >= threshold]
+    prune = [f for f in scored if f.get("_decay_score", 0) < threshold]
     
-    # Move back
-    dest = entities_dir / archived.name
-    shutil.move(str(archived), str(dest))
+    if not dry_run and prune:
+        # Rewrite graph without pruned facts
+        with file_lock(graph_file):
+            with open(graph_file, "w") as out:
+                for fact in keep:
+                    del fact["_decay_score"]  # Remove temp field
+                    out.write(json.dumps(fact) + "\n")
     
-    return f"Restored: {archived.stem} from archive"
+    return len(keep), len(prune)
+
+
+def reinforce_fact(
+    graph_file: Path,
+    subject: str,
+    predicate: str,
+    obj: str,
+) -> bool:
+    """
+    Reinforce a fact (increment reinforcement count).
+    
+    Called when a fact is confirmed/mentioned again.
+    """
+    if not graph_file.exists():
+        return False
+    
+    lines = graph_file.read_text().strip().split('\n')
+    updated = False
+    
+    with file_lock(graph_file):
+        with open(graph_file, "w") as out:
+            for line in lines:
+                if not line:
+                    continue
+                try:
+                    fact = json.loads(line)
+                    if (fact.get("subject") == subject and
+                        fact.get("predicate") == predicate and
+                        fact.get("object") == obj):
+                        fact["reinforcements"] = fact.get("reinforcements", 0) + 1
+                        fact["provenance"]["last_reinforced"] = datetime.now().isoformat()
+                        updated = True
+                    out.write(json.dumps(fact) + "\n")
+                except:
+                    out.write(line + "\n")
+    
+    return updated

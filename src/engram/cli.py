@@ -445,6 +445,43 @@ def cmd_add(args):
         print(f"   Topics: {', '.join(topics)}")
 
 
+def cmd_decay(args):
+    """Show decay scores and optionally prune old facts."""
+    from .decay import apply_decay_to_graph, prune_decayed
+    cfg = load_config(args.config)
+    
+    if args.prune:
+        kept, pruned = prune_decayed(
+            cfg.graph_file,
+            threshold=args.threshold,
+            half_life_days=args.half_life,
+            dry_run=args.dry_run,
+        )
+        action = "Would prune" if args.dry_run else "Pruned"
+        print(f"⏰ Decay Pruning")
+        print(f"  {action}: {pruned} facts below {args.threshold} threshold")
+        print(f"  Keeping: {kept} facts")
+        if args.dry_run:
+            print(f"  (use --apply to actually prune)")
+    else:
+        # Just show scores
+        scored = apply_decay_to_graph(cfg.graph_file, args.half_life)
+        
+        print(f"⏰ Decay Scores (half-life: {args.half_life} days)")
+        print(f"  Total facts: {len(scored)}")
+        
+        # Show lowest scoring
+        low = [f for f in scored if f.get("_decay_score", 1) < 0.5]
+        if low:
+            print(f"\n  Decaying ({len(low)} below 50%):")
+            for f in low[:10]:
+                score = f.get("_decay_score", 0)
+                subj = f.get("subject", "?")
+                pred = f.get("predicate", "?")
+                obj = f.get("object", "?")[:30]
+                print(f"    [{score:.1%}] {subj} → {pred} → {obj}")
+
+
 def cmd_inject(args):
     """Generate context for session injection."""
     from .inject import generate_context, write_recall_context
@@ -663,6 +700,15 @@ def main():
     p_add.add_argument("--date", "-d", help="Date (default: today)")
     p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
     p_add.set_defaults(func=cmd_add)
+    
+    # decay
+    p_decay = sub.add_parser("decay", help="Show decay scores and optionally prune")
+    p_decay.add_argument("--half-life", type=float, default=30, help="Half-life in days (default: 30)")
+    p_decay.add_argument("--threshold", type=float, default=0.1, help="Prune threshold (default: 0.1)")
+    p_decay.add_argument("--prune", action="store_true", help="Prune facts below threshold")
+    p_decay.add_argument("--dry-run", action="store_true", default=True, help="Don't actually delete (default)")
+    p_decay.add_argument("--apply", dest="dry_run", action="store_false", help="Actually prune facts")
+    p_decay.set_defaults(func=cmd_decay)
     
     # inject
     p_inject = sub.add_parser("inject", help="Generate context for session injection")
