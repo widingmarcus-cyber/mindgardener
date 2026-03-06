@@ -28,6 +28,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from .filelock import file_lock, safe_write, safe_append
+from .conflicts import detect_conflict, log_conflict, resolve_conflict, Conflict
 
 # Configuration — each agent sets its own workspace
 WORKSPACE = Path(os.environ.get("GARDENER_WORKSPACE", "/root/clawd"))
@@ -259,14 +260,25 @@ def update_entity_file(name: str, entity_type: str, facts: list,
         print(f"  Created: {filename}.md")
 
 
-def append_to_graph(triplets: list, date_str: str, provenance: dict = None):
-    """Append triplets to graph.jsonl with dedup and provenance tracking.
+def append_to_graph(
+    triplets: list, 
+    date_str: str, 
+    provenance: dict = None,
+    conflict_strategy: str = "latest_wins",
+    conflicts_file: Path = None,
+):
+    """Append triplets to graph.jsonl with dedup, provenance, and conflict detection.
     
     Args:
         triplets: List of triplet dicts with subject, predicate, object, detail
         date_str: Date string (YYYY-MM-DD)
         provenance: Optional dict with source, agent, confidence fields
+        conflict_strategy: How to resolve conflicts (latest_wins, confidence_wins, keep_both)
+        conflicts_file: Path to conflicts.md (default: memory/conflicts.md)
     """
+    if conflicts_file is None:
+        conflicts_file = MEMORY_DIR / "conflicts.md"
+    
     existing = set()
     if GRAPH_FILE.exists():
         for line in GRAPH_FILE.read_text().strip().split('\n'):
@@ -288,22 +300,46 @@ def append_to_graph(triplets: list, date_str: str, provenance: dict = None):
     }
     
     new_count = 0
+    conflict_count = 0
+    
     with file_lock(GRAPH_FILE):
         with open(GRAPH_FILE, "a") as f:
             for t in triplets:
                 key = (date_str, t["subject"], t["predicate"], t["object"])
                 if key not in existing:
-                    t["date"] = date_str
-                    t["provenance"] = {
+                    triplet_provenance = {
                         **default_provenance,
-                        # Allow triplet-level confidence override
                         "confidence": t.pop("confidence", default_provenance["confidence"]),
                     }
+                    
+                    # Check for conflicts with existing facts
+                    conflict = detect_conflict(GRAPH_FILE, t, triplet_provenance)
+                    if conflict:
+                        conflict_count += 1
+                        print(f"  ⚠️ Conflict detected: {conflict.subject} {conflict.predicate}")
+                        print(f"     Old: {conflict.old_value}")
+                        print(f"     New: {conflict.new_value}")
+                        
+                        # Log conflict for human review
+                        log_conflict(conflicts_file, conflict)
+                        
+                        # Resolve based on strategy
+                        resolved = resolve_conflict(conflict, conflict_strategy)
+                        if resolved.get("conflicted"):
+                            t["conflicted"] = True
+                            t["alternative"] = resolved.get("alternative")
+                    
+                    t["date"] = date_str
+                    t["provenance"] = triplet_provenance
                     f.write(json.dumps(t) + "\n")
                     new_count += 1
     
     if new_count:
-        print(f"  Added {new_count} new triplets to graph.jsonl (provenance: {default_provenance['source']})")
+        msg = f"  Added {new_count} new triplets to graph.jsonl"
+        if conflict_count:
+            msg += f" ({conflict_count} conflicts detected, logged to conflicts.md)"
+        msg += f" (provenance: {default_provenance['source']})"
+        print(msg)
 
 
 MAX_CHUNK_SIZE = int(os.environ.get("ENGRAM_MAX_CHUNK", "6000"))

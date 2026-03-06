@@ -445,6 +445,43 @@ def cmd_add(args):
         print(f"   Topics: {', '.join(topics)}")
 
 
+def cmd_conflicts(args):
+    """List and manage detected conflicts."""
+    cfg = load_config(args.config)
+    conflicts_file = cfg.memory_dir / "conflicts.md"
+    
+    if not conflicts_file.exists():
+        print("No conflicts detected yet.")
+        return
+    
+    content = conflicts_file.read_text()
+    
+    # Count conflicts
+    unresolved = content.count("**Status:** Unresolved")
+    resolved = content.count("**Status:** Resolved")
+    
+    print(f"⚠️ Conflicts Summary")
+    print(f"  Unresolved: {unresolved}")
+    print(f"  Resolved:   {resolved}")
+    print(f"  Total:      {unresolved + resolved}")
+    
+    if args.show:
+        print(f"\n--- conflicts.md ---\n")
+        print(content)
+    
+    if args.clear_resolved:
+        # Remove resolved conflicts from file
+        lines = content.split("\n## ")
+        header = lines[0]
+        conflicts = lines[1:] if len(lines) > 1 else []
+        
+        unresolved_conflicts = [c for c in conflicts if "**Status:** Unresolved" in c]
+        
+        new_content = header + "\n## ".join([""] + unresolved_conflicts) if unresolved_conflicts else header
+        conflicts_file.write_text(new_content.strip() + "\n")
+        print(f"  Cleared {resolved} resolved conflicts.")
+
+
 def cmd_stats(args):
     """Show garden statistics."""
     cfg = load_config(args.config)
@@ -599,6 +636,12 @@ def main():
     p_add.add_argument("--date", "-d", help="Date (default: today)")
     p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
     p_add.set_defaults(func=cmd_add)
+    
+    # conflicts
+    p_conflicts = sub.add_parser("conflicts", help="List and manage detected conflicts")
+    p_conflicts.add_argument("--show", action="store_true", help="Show full conflicts.md")
+    p_conflicts.add_argument("--clear-resolved", action="store_true", help="Remove resolved conflicts from file")
+    p_conflicts.set_defaults(func=cmd_conflicts)
 
     # stats
     p_stats = sub.add_parser("stats", help="Show garden statistics")
