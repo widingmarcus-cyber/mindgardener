@@ -9,7 +9,17 @@ garden init
 
 That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
-**Status:** Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (10+ merged PRs). Story: https://medium.com/@widing.marcus/i-gave-4-ais-a-discord-server-and-walked-away-ab96743f97ab
+**Status:** v1.1 — Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (16+ merged PRs). Story: https://medium.com/@widing.marcus/i-gave-4-ais-a-discord-server-and-walked-away-ab96743f97ab
+
+### v1.1 Features (2026-03-06)
+- 🔍 **Provenance tracking** — know where every fact came from
+- ⚔️ **Conflict detection** — flags when new info contradicts old
+- 🚀 **Auto-injection** — context ready at session start
+- ⏰ **Temporal decay** — old facts fade unless reinforced
+- 🔒 **Concurrency** — file locks for multi-agent safety
+- 🔮 **Semantic search** — find facts by meaning, not keywords
+- 📊 **Confidence levels** — not all facts are equally reliable
+- 🤝 **Multi-agent sync** — merge per-agent memories to shared
 
 ---
 
@@ -139,7 +149,7 @@ Every assembly is logged with a **manifest** — you can audit exactly what your
 
 ---
 
-## All 13 Commands
+## All Commands
 
 | Command | What it does | LLM? | Cost |
 |---------|-------------|------|------|
@@ -156,8 +166,16 @@ Every assembly is logged with a **manifest** — you can audit exactly what your
 | `garden reindex` | Rebuild graph from entity files | No | Free |
 | `garden viz` | Mermaid graph visualization | No | Free |
 | `garden stats` | Quick overview | No | Free |
+| **v1.1 Commands** | | | |
+| `garden add "fact"` | Add fact with provenance | No | Free |
+| `garden conflicts` | List/manage detected conflicts | No | Free |
+| `garden inject` | Generate context for injection | No | Free |
+| `garden decay` | Show/prune decayed facts | No | Free |
+| `garden embed --build` | Build semantic search index | API | ~$0.001 |
+| `garden embed -q "topic"` | Semantic search | API | ~$0.0001 |
+| `garden sync` | Sync multi-agent memories | No | Free |
 
-Only 3 commands call an LLM. The other 10 are pure file operations.
+Only 3 commands call an LLM. Embed uses embedding API (Gemini free tier).
 
 ---
 
