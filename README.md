@@ -9,7 +9,7 @@ garden init
 
 That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
-**Status:** v1.1 — Running in production. Built by an OpenClaw experienced contributor (16+ merged PRs). 
+**Status:** v1.1 — Running in production. Built for multi-agent swarms. 
 
 ### v1.1 Features (2026-03-06)
 - 🔍 **Provenance tracking** — know where every fact came from
@@ -177,9 +177,11 @@ Only 3 commands call an LLM. Everything else is pure file operations.
 
 ---
 
-## LLM Providers
+## LLM Providers (Optional)
 
-MindGardener works with any LLM. Configure in `garden.yaml`:
+MindGardener is **local-first**. Only 3 commands need an LLM (`extract`, `surprise`, `consolidate`). Everything else is pure file operations.
+
+For fully local operation, use Ollama. Configure in `garden.yaml`:
 
 ```yaml
 extraction:
@@ -287,7 +289,7 @@ $ python -m pytest tests/ -q
 120 passed in 2.34s
 ```
 
-120 tests. All run in <3 seconds. No network calls (all mocked).
+172 tests. All run in <3 seconds. No network calls (all mocked).
 
 ---
 
@@ -345,8 +347,8 @@ MindGardener draws from cognitive science research on memory:
 - [x] Context manifests (audit trail)
 - [x] Multi-provider LLM support (5 providers)
 - [x] Multi-agent shared brain
-- [x] 120 tests
-- [ ] Concurrency safety (file locks)
+- [x] 172 tests
+- [x] Concurrency safety (file locks)
 - [ ] Optional embedding plugin
 - [ ] Incremental indexing
 - [ ] Background daemon mode
