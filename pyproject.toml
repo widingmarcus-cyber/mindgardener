@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mindgardener"
-version = "1.0.0"
+version = "1.1.0"
 description = "Local-first long-term memory for autonomous agents. Wiki knowledge graph, surprise scoring, identity-level consolidation."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    { name = "Marcus Widing" },
+    { name = "MindGardener Contributors" },
 ]
 keywords = ["ai", "agents", "memory", "knowledge-graph", "llm"]
 classifiers = [

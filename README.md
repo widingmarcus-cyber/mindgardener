@@ -67,6 +67,39 @@ garden context "job search" --budget 4000 # Get relevant memory, within budget
 
 For fully local (no API key): `garden init --provider ollama`
 
+### For OpenClaw Users
+
+If you're running OpenClaw, add MindGardener as a skill:
+
+```bash
+# In your workspace
+pip install mindgardener
+garden init
+```
+
+Then add to your agent's nightly cron or BOOTSTRAP.md:
+```bash
+# Nightly maintenance (add to your cron)
+garden extract && garden surprise && garden consolidate
+
+# Session start (add to BOOTSTRAP.md or heartbeat)
+garden inject --output RECALL-CONTEXT.md
+```
+
+Your agent will now:
+- Build memory from daily conversation logs
+- Score events by surprise (unexpected = important)
+- Generate relevant context at session start
+- Track conflicts when facts change
+
+**What changes from default OpenClaw?**
+- New `memory/entities/` folder with wiki pages
+- `graph.jsonl` for knowledge triplets
+- `RECALL-CONTEXT.md` updated at session start
+- `garden.yaml` config file
+
+Everything is markdown files. No database. Works offline.
+
 ### The Nightly Sleep Cycle
 
 Run this on a cron (or manually). It's your agent's equivalent of sleep:
