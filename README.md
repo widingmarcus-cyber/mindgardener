@@ -17,7 +17,7 @@ That's it. Your agent now has persistent memory. No database. No server. No Dock
 - 🚀 **Auto-injection** — context ready at session start
 - ⏰ **Temporal decay** — old facts fade unless reinforced
 - 🔒 **Concurrency** — file locks for multi-agent safety
-- 🔮 **Semantic search** — find facts by meaning, not keywords
+- 🔮 **Associative recall** — follow wikilinks + graph traversal
 - 📊 **Confidence levels** — not all facts are equally reliable
 - 🤝 **Multi-agent sync** — merge per-agent memories to shared
 
@@ -171,11 +171,9 @@ Every assembly is logged with a **manifest** — you can audit exactly what your
 | `garden conflicts` | List/manage detected conflicts | No | Free |
 | `garden inject` | Generate context for injection | No | Free |
 | `garden decay` | Show/prune decayed facts | No | Free |
-| `garden embed --build` | Build semantic search index | API | ~$0.001 |
-| `garden embed -q "topic"` | Semantic search | API | ~$0.0001 |
 | `garden sync` | Sync multi-agent memories | No | Free |
 
-Only 3 commands call an LLM. Embed uses embedding API (Gemini free tier).
+Only 3 commands call an LLM. Everything else is pure file operations.
 
 ---
 
