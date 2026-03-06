@@ -390,25 +390,6 @@ MindGardener draws from cognitive science research on memory:
 
 ---
 
-## Roadmap
-
-- [x] Entity extraction from markdown logs
-- [x] Wiki-style pages with `[[wikilinks]]`
-- [x] Knowledge graph (JSONL triplets)
-- [x] Surprise scoring (prediction error)
-- [x] Token-budget-aware context assembly
-- [x] Context manifests (audit trail)
-- [x] Multi-provider LLM support (5 providers)
-- [x] Multi-agent shared brain
-- [x] 172 tests
-- [x] Concurrency safety (file locks)
-- [ ] Optional embedding plugin
-- [ ] Incremental indexing
-- [ ] Background daemon mode
-- [ ] Context evaluator (fact-checking loop)
-- [ ] pip package on PyPI
-
----
 
 ## License
 
