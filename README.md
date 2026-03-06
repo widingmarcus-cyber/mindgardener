@@ -9,7 +9,7 @@ garden init
 
 That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
-**Status:** v1.1 — Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (16+ merged PRs). Story: 
+**Status:** v1.1 — Running in production. Built by an OpenClaw experienced contributor (16+ merged PRs). 
 
 ### v1.1 Features (2026-03-06)
 - 🔍 **Provenance tracking** — know where every fact came from
