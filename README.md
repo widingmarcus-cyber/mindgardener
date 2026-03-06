@@ -9,7 +9,7 @@ garden init
 
 That's it. Your agent now has persistent memory. No database. No server. No Docker. Just files.
 
-**Status:** v1.1 — Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (16+ merged PRs). Story: https://medium.com/@widing.marcus/i-gave-4-ais-a-discord-server-and-walked-away-ab96743f97ab
+**Status:** v1.1 — Running in production in our own multi-agent workspace. Built by an OpenClaw experienced contributor (16+ merged PRs). Story: 
 
 ### v1.1 Features (2026-03-06)
 - 🔍 **Provenance tracking** — know where every fact came from
@@ -48,7 +48,7 @@ Your agent's memory is just a folder of files. `grep` it. `git diff` it. Open it
 ## What You Get
 
 After a month, your agent has:
-- **30–80 entity files** — one per person, company, project (`memory/entities/Kadoa.md`)
+- **30–80 entity files** — one per person, company, project (`memory/entities/Acme.md`)
 - **A knowledge graph** — `[[wikilinks]]` + triplets, no database needed
 - **Curated long-term memory** — only the surprising stuff survives
 - **Token-budget retrieval** — `garden context "topic" --budget 4000` loads exactly what fits
@@ -82,7 +82,7 @@ garden prune --days 30          # Archive entities inactive >30 days
 ### Retrieval (no LLM needed)
 
 ```bash
-garden recall "Kadoa"                     # Search entities + graph
+garden recall "Acme"                     # Search entities + graph
 garden context "job search" --budget 4000  # Token-budget assembly
 garden evaluate --text "Agent said X"      # Fact-check against knowledge graph
 garden beliefs                             # View identity model
@@ -97,7 +97,7 @@ garden beliefs                             # View identity model
 `garden extract` reads a daily log and creates one `.md` file per entity:
 
 ```markdown
-# Kadoa
+# Acme
 **Type:** company
 
 ## Facts
@@ -105,8 +105,8 @@ garden beliefs                             # View identity model
 
 ## Timeline
 ### [[2026-02-16]]
-- [[Marcus]] received reply from [[Adrian Krebs]] after [[HN]] outreach
-- [[Revenue Hunter]] sent cold email to adrian@kadoa.com
+- [[Alex]] received reply from [[Jane Smith]] after [[HN]] outreach
+- [[Revenue Hunter]] sent cold email to contact@acme.com
 ```
 
 Each `[[wikilink]]` is an edge in the knowledge graph. The graph emerges from the text — no schema, no migration.
@@ -137,7 +137,7 @@ Every assembly is logged with a **manifest** — you can audit exactly what your
 
 ```json
 {
-  "query": "Kadoa",
+  "query": "Acme",
   "token_budget": 4000,
   "tokens_used": 1847,
   "utilization": 0.46,
@@ -304,10 +304,10 @@ your-workspace/
     ├── surprise-scores.jsonl         # What was unexpected
     ├── context-manifests.jsonl       # Audit trail
     └── entities/
-        ├── Marcus.md                # Person
-        ├── Kadoa.md                 # Company
+        ├── Alex.md                # Person
+        ├── Acme.md                 # Company
         ├── MindGardener.md          # Project
-        └── Adrian-Krebs.md          # Person
+        └── Jane-Smith.md          # Person
 ```
 
 Everything is a text file. Everything is `grep`-able. Everything is `git`-able.
@@ -361,4 +361,4 @@ MIT
 
 ## Credits
 
-Built by the [Swarm](https://github.com/widingmarcus-cyber/discord-agent-swarm) — a team of autonomous AI agents coordinating via Discord.
+Built by a multi-agent swarm coordinating via Discord.
