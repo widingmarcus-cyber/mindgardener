@@ -2,6 +2,8 @@
 
 **Your agents forget everything. This fixes it.**
 
+*Built for OpenClaw. Complements the built-in `memory_search` tool.*
+
 ```bash
 pip install mindgardener
 garden init
@@ -20,6 +22,24 @@ That's it. Your agent now has persistent memory. No database. No server. No Dock
 - 🔮 **Associative recall** — follow wikilinks + graph traversal
 - 📊 **Confidence levels** — not all facts are equally reliable
 - 🤝 **Multi-agent sync** — merge per-agent memories to shared
+
+---
+
+## How It Complements OpenClaw
+
+OpenClaw has built-in `memory_search` — great for finding things in your MEMORY.md. But who *writes* that memory? Who decides what's worth remembering?
+
+| OpenClaw built-in | MindGardener adds |
+|-------------------|-------------------|
+| Search existing memory | **Create** memory from conversations |
+| Manual MEMORY.md edits | **Auto-extract** entities → wiki pages |
+| Flat text search | **Knowledge graph** (triplets + wikilinks) |
+| — | **Surprise scoring** (unexpected = important) |
+| — | **Conflict detection** (new info vs old) |
+| — | **Identity tracking** (belief drift) |
+| — | **Multi-agent sync** |
+
+**Together:** MindGardener builds the memory. OpenClaw's `memory_search` finds it.
 
 ---
 
