@@ -402,6 +402,49 @@ def cmd_beliefs(args):
             print(model.format_readable())
 
 
+def cmd_add(args):
+    """Add a fact manually with provenance tracking."""
+    from .core import append_to_graph, MEMORY_DIR
+    from datetime import date, datetime
+    import os
+    
+    cfg = load_config(args.config)
+    
+    # Parse fact into triplet
+    fact = args.fact
+    
+    # Build triplet
+    triplet = {
+        "subject": args.subject or "Marcus",  # Default subject
+        "predicate": args.predicate or "noted",
+        "object": fact,
+        "detail": args.detail or "",
+    }
+    
+    # Build provenance
+    provenance = {
+        "source": args.source or "manual",
+        "agent": args.agent or os.environ.get("AGENT_ID", "user"),
+        "confidence": args.confidence or 0.9,
+    }
+    
+    date_str = args.date or date.today().isoformat()
+    
+    # Add to graph
+    append_to_graph([triplet], date_str, provenance=provenance)
+    
+    print(f"✅ Added fact with provenance:")
+    print(f"   {triplet['subject']} → {triplet['predicate']} → {triplet['object']}")
+    print(f"   Source: {provenance['source']}")
+    print(f"   Agent: {provenance['agent']}")
+    print(f"   Confidence: {provenance['confidence']}")
+    
+    # Optionally add topics
+    if args.topics:
+        topics = [t.strip() for t in args.topics.split(",")]
+        print(f"   Topics: {', '.join(topics)}")
+
+
 def cmd_stats(args):
     """Show garden statistics."""
     cfg = load_config(args.config)
@@ -543,6 +586,19 @@ def main():
     p_beliefs.add_argument("--json", action="store_true", help="Output as JSON")
     p_beliefs.add_argument("--weak", action="store_true", help="Show only weakening beliefs")
     p_beliefs.set_defaults(func=cmd_beliefs)
+    
+    # add (manual fact with provenance)
+    p_add = sub.add_parser("add", help="Add a fact manually with provenance tracking")
+    p_add.add_argument("fact", help="The fact to add")
+    p_add.add_argument("--subject", "-s", help="Subject entity (default: Marcus)")
+    p_add.add_argument("--predicate", "-p", help="Relationship verb (default: noted)")
+    p_add.add_argument("--detail", help="Additional context")
+    p_add.add_argument("--source", help="Source (e.g., 'twitter:@anthropic', 'file:doc.md', 'url:https://...')")
+    p_add.add_argument("--agent", help="Agent that recorded this (default: from AGENT_ID env)")
+    p_add.add_argument("--confidence", type=float, help="Confidence 0.0-1.0 (default: 0.9)")
+    p_add.add_argument("--date", "-d", help="Date (default: today)")
+    p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
+    p_add.set_defaults(func=cmd_add)
 
     # stats
     p_stats = sub.add_parser("stats", help="Show garden statistics")

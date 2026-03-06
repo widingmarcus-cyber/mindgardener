@@ -54,7 +54,7 @@ EXTRACT_PROMPT = """Extract structured knowledge from this daily log. Output ONL
     }
   ],
   "triplets": [
-    {"subject": "Entity1", "predicate": "verb_phrase", "object": "Entity2", "detail": "context"}
+    {"subject": "Entity1", "predicate": "verb_phrase", "object": "Entity2", "detail": "context", "confidence": 0.9}
   ],
   "events": [
     {"description": "what happened", "entities": ["Entity1"], "significance": "low|medium|high"}
@@ -259,8 +259,14 @@ def update_entity_file(name: str, entity_type: str, facts: list,
         print(f"  Created: {filename}.md")
 
 
-def append_to_graph(triplets: list, date_str: str):
-    """Append triplets to graph.jsonl with dedup."""
+def append_to_graph(triplets: list, date_str: str, provenance: dict = None):
+    """Append triplets to graph.jsonl with dedup and provenance tracking.
+    
+    Args:
+        triplets: List of triplet dicts with subject, predicate, object, detail
+        date_str: Date string (YYYY-MM-DD)
+        provenance: Optional dict with source, agent, confidence fields
+    """
     existing = set()
     if GRAPH_FILE.exists():
         for line in GRAPH_FILE.read_text().strip().split('\n'):
@@ -271,6 +277,16 @@ def append_to_graph(triplets: list, date_str: str):
                 except:
                     pass
     
+    # Build default provenance if not provided
+    if provenance is None:
+        provenance = {}
+    default_provenance = {
+        "source": provenance.get("source", f"file:memory/{date_str}.md"),
+        "agent": provenance.get("agent", os.environ.get("AGENT_ID", "unknown")),
+        "confidence": provenance.get("confidence", 0.8),
+        "timestamp": datetime.now().isoformat(),
+    }
+    
     new_count = 0
     with file_lock(GRAPH_FILE):
         with open(GRAPH_FILE, "a") as f:
@@ -278,12 +294,16 @@ def append_to_graph(triplets: list, date_str: str):
                 key = (date_str, t["subject"], t["predicate"], t["object"])
                 if key not in existing:
                     t["date"] = date_str
-                    t["timestamp"] = datetime.now().isoformat()
+                    t["provenance"] = {
+                        **default_provenance,
+                        # Allow triplet-level confidence override
+                        "confidence": t.pop("confidence", default_provenance["confidence"]),
+                    }
                     f.write(json.dumps(t) + "\n")
                     new_count += 1
     
     if new_count:
-        print(f"  Added {new_count} new triplets to graph.jsonl")
+        print(f"  Added {new_count} new triplets to graph.jsonl (provenance: {default_provenance['source']})")
 
 
 MAX_CHUNK_SIZE = int(os.environ.get("ENGRAM_MAX_CHUNK", "6000"))
@@ -442,7 +462,13 @@ def process_date(date_str: str):
         )
     
     if triplets:
-        append_to_graph(triplets, date_str)
+        # Add provenance metadata
+        provenance = {
+            "source": f"file:memory/{date_str}.md",
+            "agent": os.environ.get("AGENT_ID", "unknown"),
+            "confidence": 0.8,  # Default confidence for LLM extraction
+        }
+        append_to_graph(triplets, date_str, provenance=provenance)
 
 
 def run_surprise(date_str: str):
