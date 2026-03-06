@@ -445,6 +445,39 @@ def cmd_add(args):
         print(f"   Topics: {', '.join(topics)}")
 
 
+def cmd_sync(args):
+    """Sync agent memories to shared memory."""
+    from .sync import sync_all_agents, sync_agent_to_shared, list_agents
+    cfg = load_config(args.config)
+    
+    if args.list:
+        agents = list_agents(cfg.workspace)
+        print(f"🔄 Registered agents: {len(agents)}")
+        for a in agents:
+            print(f"  - {a}")
+        return
+    
+    if args.agent:
+        print(f"🔄 Syncing {args.agent} to shared memory...")
+        result = sync_agent_to_shared(
+            cfg.workspace,
+            args.agent,
+            dry_run=not args.apply,
+        )
+    else:
+        print("🔄 Syncing all agents to shared memory...")
+        result = sync_all_agents(
+            cfg.workspace,
+            dry_run=not args.apply,
+        )
+    
+    print(f"  Added: {result.get('total_added', result.get('added', 0))}")
+    print(f"  Conflicts: {result.get('total_conflicts', result.get('conflicts', 0))}")
+    
+    if not args.apply:
+        print("  (dry run - use --apply to merge)")
+
+
 def cmd_embed(args):
     """Build or query embedding index for semantic search."""
     from .embeddings import build_embedding_index, semantic_search
@@ -743,6 +776,13 @@ def main():
     p_add.add_argument("--date", "-d", help="Date (default: today)")
     p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
     p_add.set_defaults(func=cmd_add)
+    
+    # sync
+    p_sync = sub.add_parser("sync", help="Sync agent memories to shared memory")
+    p_sync.add_argument("--agent", "-a", help="Sync specific agent")
+    p_sync.add_argument("--list", action="store_true", help="List registered agents")
+    p_sync.add_argument("--apply", action="store_true", help="Actually merge (default: dry run)")
+    p_sync.set_defaults(func=cmd_sync)
     
     # embed
     p_embed = sub.add_parser("embed", help="Build/query embedding index for semantic search")
