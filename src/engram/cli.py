@@ -445,6 +445,33 @@ def cmd_add(args):
         print(f"   Topics: {', '.join(topics)}")
 
 
+def cmd_inject(args):
+    """Generate context for session injection."""
+    from .inject import generate_context, write_recall_context
+    cfg = load_config(args.config)
+    
+    if args.output:
+        # Write to file
+        output_path = Path(args.output)
+        write_recall_context(
+            cfg,
+            output_path=output_path,
+            query=args.query,
+            max_tokens=args.budget,
+            strategy=args.strategy,
+        )
+        print(f"✅ Wrote context to {output_path}")
+    else:
+        # Print to stdout
+        context = generate_context(
+            cfg,
+            query=args.query,
+            max_tokens=args.budget,
+            strategy=args.strategy,
+        )
+        print(context)
+
+
 def cmd_conflicts(args):
     """List and manage detected conflicts."""
     cfg = load_config(args.config)
@@ -636,6 +663,15 @@ def main():
     p_add.add_argument("--date", "-d", help="Date (default: today)")
     p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
     p_add.set_defaults(func=cmd_add)
+    
+    # inject
+    p_inject = sub.add_parser("inject", help="Generate context for session injection")
+    p_inject.add_argument("--query", "-q", help="Focus context on specific topic")
+    p_inject.add_argument("--output", "-o", help="Write to file (default: stdout)")
+    p_inject.add_argument("--budget", type=int, default=2000, help="Token budget (default: 2000)")
+    p_inject.add_argument("--strategy", choices=["recent_only", "recent_and_relevant", "query_based"],
+                         default="recent_and_relevant", help="Injection strategy")
+    p_inject.set_defaults(func=cmd_inject)
     
     # conflicts
     p_conflicts = sub.add_parser("conflicts", help="List and manage detected conflicts")
