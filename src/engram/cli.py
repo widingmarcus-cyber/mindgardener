@@ -445,6 +445,49 @@ def cmd_add(args):
         print(f"   Topics: {', '.join(topics)}")
 
 
+def cmd_embed(args):
+    """Build or query embedding index for semantic search."""
+    from .embeddings import build_embedding_index, semantic_search
+    cfg = load_config(args.config)
+    
+    index_path = cfg.memory_dir / "embeddings.json"
+    
+    if args.build:
+        print("🔮 Building embedding index...")
+        added = build_embedding_index(
+            cfg.graph_file,
+            index_path,
+            force=args.force,
+        )
+        print(f"  Added {added} embeddings to index")
+        print(f"  Index: {index_path}")
+    
+    elif args.query:
+        print(f"🔮 Semantic search: '{args.query}'")
+        results = semantic_search(args.query, index_path, limit=args.limit)
+        
+        if not results:
+            print("  No results (is index built?)")
+            return
+        
+        for fact, sim in results:
+            subj = fact.get("subject", "?")
+            pred = fact.get("predicate", "?")
+            obj = fact.get("object", "?")[:40]
+            print(f"  [{sim:.2f}] {subj} → {pred} → {obj}")
+    
+    else:
+        # Show index stats
+        if index_path.exists():
+            import json
+            data = json.loads(index_path.read_text())
+            print(f"🔮 Embedding Index")
+            print(f"  Facts indexed: {len(data)}")
+            print(f"  Path: {index_path}")
+        else:
+            print("  No index yet. Run: garden embed --build")
+
+
 def cmd_decay(args):
     """Show decay scores and optionally prune old facts."""
     from .decay import apply_decay_to_graph, prune_decayed
@@ -700,6 +743,14 @@ def main():
     p_add.add_argument("--date", "-d", help="Date (default: today)")
     p_add.add_argument("--topics", help="Comma-separated topics for context-aware injection")
     p_add.set_defaults(func=cmd_add)
+    
+    # embed
+    p_embed = sub.add_parser("embed", help="Build/query embedding index for semantic search")
+    p_embed.add_argument("--build", action="store_true", help="Build embedding index")
+    p_embed.add_argument("--query", "-q", help="Semantic search query")
+    p_embed.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    p_embed.add_argument("--force", action="store_true", help="Re-embed all facts")
+    p_embed.set_defaults(func=cmd_embed)
     
     # decay
     p_decay = sub.add_parser("decay", help="Show decay scores and optionally prune")
