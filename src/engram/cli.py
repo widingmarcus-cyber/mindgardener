@@ -770,6 +770,28 @@ def main():
     p_stats = sub.add_parser("stats", help="Show garden statistics")
     p_stats.set_defaults(func=cmd_stats)
     
+
+    # inbox
+    p_inbox = sub.add_parser("inbox", help="Quick-capture inbox for immediate tagging")
+    p_inbox.add_argument("--add", "-a", metavar="EVENT", help="Add event to inbox")
+    p_inbox.add_argument("--importance", "-i", choices=["high", "medium", "low"], default="medium",
+                        help="Importance level (default: medium)")
+    p_inbox.add_argument("--source", "-s", help="Source of event (e.g., email, interview)")
+    p_inbox.add_argument("--topics", "-t", help="Comma-separated topics")
+    p_inbox.add_argument("--list", "-l", action="store_true", help="List inbox items")
+    p_inbox.add_argument("--all", action="store_true", help="Include processed items")
+    p_inbox.add_argument("--process", "-p", action="store_true", help="Process inbox items")
+    p_inbox.add_argument("--clear", action="store_true", help="Clear processed items")
+    p_inbox.set_defaults(func=cmd_inbox)
+    
+    # core
+    p_core = sub.add_parser("core", help="Show core entities and prune candidates")
+    p_core.add_argument("--top", type=int, default=10, help="Top N entities to show")
+    p_core.add_argument("--prune-candidates", action="store_true", help="Show entities to prune")
+    p_core.add_argument("--threshold", type=float, default=0.1, help="Importance threshold for pruning")
+    p_core.add_argument("--min-age", type=int, default=30, help="Min age in days before pruning")
+    p_core.set_defaults(func=cmd_core)
+
     args = parser.parse_args()
     
     if not args.command:
@@ -781,3 +803,87 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def cmd_inbox(args):
+    """Manage the quick-capture inbox."""
+    cfg = load_config(args.config)
+    from .inbox import add_to_inbox, list_inbox, process_inbox, clear_processed
+    
+    if args.add:
+        result = add_to_inbox(
+            cfg.memory_dir,
+            args.add,
+            importance=args.importance,
+            source=args.source,
+            topics=args.topics.split(",") if args.topics else None,
+        )
+        print(f"✅ {result}")
+        
+    elif args.list:
+        items = list_inbox(cfg.memory_dir, unprocessed_only=not args.all)
+        if not items:
+            print("📭 Inbox empty")
+            return
+        
+        print(f"📬 Inbox ({len(items)} items)")
+        for item in items:
+            tag = {"high": "🔴", "medium": "🟡", "low": "⚪"}[item["importance"]]
+            status = "✓" if item["processed"] else " "
+            print(f"  [{status}] {tag} {item['text'][:60]}")
+            
+    elif args.process:
+        print("🔄 Processing inbox...")
+        stats = process_inbox(cfg.memory_dir)
+        print(f"  Processed: {stats['processed']}")
+        print(f"  Skipped: {stats['skipped']}")
+        
+    elif args.clear:
+        cleared = clear_processed(cfg.memory_dir)
+        print(f"🗑️ Cleared {cleared} processed items")
+        
+    else:
+        # Default: show inbox
+        items = list_inbox(cfg.memory_dir, unprocessed_only=True)
+        if not items:
+            print("📭 Inbox empty. Add items with: garden inbox --add \"event\"")
+        else:
+            print(f"📬 {len(items)} unprocessed items. Process with: garden inbox --process")
+            for item in items[:5]:
+                tag = {"high": "🔴", "medium": "🟡", "low": "⚪"}[item["importance"]]
+                print(f"  {tag} {item['text'][:60]}")
+            if len(items) > 5:
+                print(f"  ... and {len(items) - 5} more")
+
+
+def cmd_core(args):
+    """Show core entities (high importance) and prune candidates."""
+    cfg = load_config(args.config)
+    from .strengthen import get_core_entities, get_prune_candidates, load_access_log
+    
+    if args.prune_candidates:
+        candidates = get_prune_candidates(
+            cfg.entities_dir,
+            cfg.memory_dir,
+            threshold=args.threshold,
+            min_age_days=args.min_age,
+        )
+        if not candidates:
+            print("✅ No prune candidates (all entities accessed recently)")
+            return
+        
+        print(f"🗑️ Prune candidates ({len(candidates)}):")
+        for c in candidates:
+            print(f"  [{c['importance']:.2f}] {c['entity']} (age: {c['age_days']}d, accesses: {c['access_count']})")
+            
+    else:
+        core = get_core_entities(cfg.entities_dir, cfg.memory_dir, top_n=args.top)
+        
+        print(f"⭐ Core entities (top {args.top}):")
+        for e in core:
+            print(f"  [{e['importance']:.2f}] {e['entity']} (accesses: {e['access_count']})")
+        
+        # Also show access stats
+        access_data = load_access_log(cfg.memory_dir)
+        total_accesses = sum(access_data.get("counts", {}).values())
+        print(f"\n📊 Total accesses logged: {total_accesses}")

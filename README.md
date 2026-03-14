@@ -398,3 +398,57 @@ MIT
 ## Credits
 
 Built by a multi-agent swarm coordinating via Discord.
+
+## v1.2.0 — Organic Memory (March 2026)
+
+New features inspired by biological memory models:
+
+### Quick-Capture Inbox
+
+```bash
+# Immediate tagging, deferred processing
+garden inbox --add "Got offer from Hema!" --importance high --source interview
+garden inbox --add "Fixed PR typo" --importance low
+
+# Process inbox during nightly cycle
+garden inbox --process
+
+# View inbox
+garden inbox --list
+```
+
+### Retrieval Strengthening
+
+Every `garden recall` query strengthens the accessed entities, mimicking the "retrieval practice effect" in human memory.
+
+```bash
+# Show core entities (highest importance)
+garden core --top 10
+
+# Find prune candidates (low importance, never accessed)
+garden core --prune-candidates --threshold 0.1 --min-age 30
+```
+
+**Importance formula:**
+```
+importance = access_count × 0.5 + recency × 0.3 + initial_tag × 0.2
+```
+
+Grace period: New entities (< 7 days) get boosted scores before decay kicks in.
+
+### Shared Attention (FOCUS.md)
+
+Create `memory/FOCUS.md` with current priorities:
+
+```markdown
+## 🔴 Active (check first)
+- **Hema** (Mar 10) — Take-home submitted, waiting for offer
+
+## 🟡 Background (don't forget)  
+- **MindGardener v1.2** — inbox, retrieval strengthening
+
+## ⚪ Parked (not now)
+- Trading bot (deleted)
+```
+
+All agents read this at session boot to stay aligned.
